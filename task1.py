@@ -2,6 +2,7 @@ import bpy
 import sys
 from pathlib import Path
 from mathutils import Vector
+from infinigen.core.util.math import FixedSeed
 
 # 添加项目根目录到 Python 路径
 sys.path.append('/home/astin/infinigen')
@@ -68,10 +69,10 @@ def generate_asset(factory, factory_name, seed):
     else:
         raise AttributeError(f"{factory_name} does not have 'create_asset' or 'generate' method.")
 
-def add_camera_and_light(obj, distance_factor=2.5):
+def add_camera_and_light(obj, distance_factor=3):
     """
     为场景添加相机和光源，并调整相机位置使其对准物体。
-    distance_factor: 距离系数，越大相机越远（默认2.5，比之前的1.5更远）
+    distance_factor: 距离系数，越大相机越远（默认3.5，比之前的1.5更远）
     """
     # 计算物体的包围盒中心及尺寸
     bbox_corners = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
@@ -99,7 +100,7 @@ def add_camera_and_light(obj, distance_factor=2.5):
     # 添加太阳光（从上方斜照）
     bpy.ops.object.light_add(type='SUN', location=center + Vector((2, 2, 5)))
     sun = bpy.context.object
-    sun.data.energy = 2.0
+    sun.data.energy = 2.5
     # 可选：添加一个补光的环境光（通过世界材质）
     world = bpy.context.scene.world
     if world is None:
@@ -108,7 +109,7 @@ def add_camera_and_light(obj, distance_factor=2.5):
     world.use_nodes = True
     bg_node = world.node_tree.nodes.get('Background')
     if bg_node:
-        bg_node.inputs['Strength'].default_value = 0.5  # 环境光强度
+        bg_node.inputs['Strength'].default_value = 1  # 环境光强度
 
 def render_image(output_path):
     """渲染当前场景并保存为 PNG"""
@@ -132,8 +133,9 @@ def main():
             print(f"  种子: {seed}")
             setup_scene()
             try:
-                factory_instance = FactoryClass(seed)
-                generate_asset(factory_instance, factory_name, seed)
+                with FixedSeed(seed):  # 设置固定随机种子
+                    factory_instance = FactoryClass(seed)
+                    generate_asset(factory_instance, factory_name, seed)
 
                 # 获取生成的物体（第一个Mesh物体）
                 obj = None
@@ -145,7 +147,7 @@ def main():
                     print("    ⚠️ 未找到生成的物体，跳过渲染")
                 else:
                     # 添加相机和灯光（距离较远）
-                    add_camera_and_light(obj, distance_factor=2.5)
+                    add_camera_and_light(obj, distance_factor=3)
                     # 创建输出目录
                     output_dir = Path(f"task1/{factory_name}/seed_{seed}")
                     output_dir.mkdir(parents=True, exist_ok=True)
